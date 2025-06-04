@@ -1,6 +1,6 @@
 #!/bin/bash
-# Python Dev Template Initializer
-# A bash script to create new Python projects from this template with custom configuration.
+# Python Dev Template Setup Script
+# A unified setup script that works for both GitHub template usage and direct cloning.
 
 set -euo pipefail # Exit on error, undefined vars, pipe failures
 
@@ -16,7 +16,6 @@ readonly NC='\033[0m' # No Color
 # Script configuration
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly DEFAULT_PYTHON_VERSION="3.12"
-readonly DEFAULT_TARGET_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Files that need template variable replacement
 readonly -a TEMPLATE_FILES=(
@@ -28,29 +27,13 @@ readonly -a TEMPLATE_FILES=(
     "tests/test_main.py"
 )
 
-# Directories to exclude when copying template
-readonly -a EXCLUDE_DIRS=(
-    "__pycache__"
-    ".pytest_cache"
-    ".mypy_cache"
-    ".ruff_cache"
-    "build"
-    "dist"
-    ".git"
-    ".venv"
-    "coverage_html_report"
-)
-
-# Files to exclude when copying template
-readonly -a EXCLUDE_FILES=(
-    "init_project.py"
+# Files to exclude when this is in template mode (not needed in final project)
+readonly -a TEMPLATE_SETUP_FILES=(
     "init_project.sh"
     "setup.sh"
-    "setup.py"
     "TEMPLATE_README.md"
-    ".coverage"
-    "*.pyc"
-    "*.pyo"
+    "setup.py"
+    "init_project.py"
 )
 
 # Logging functions
@@ -72,20 +55,23 @@ log_error() {
 
 # Show usage information
 show_help() {
-    printf "%bPython Dev Template Initializer%b\n\n" "$BOLD" "$NC"
+    printf "%bPython Dev Template Setup%b\n\n" "$BOLD" "$NC"
     printf "%bUSAGE:%b\n" "$CYAN" "$NC"
     printf "    %s PROJECT_NAME [OPTIONS]\n\n" "$0"
     printf "%bARGUMENTS:%b\n" "$CYAN" "$NC"
-    printf "    PROJECT_NAME    Name of the new project (lowercase, hyphens/underscores allowed)\n\n"
+    printf "    PROJECT_NAME    Name for your project (lowercase, hyphens/underscores allowed)\n\n"
     printf "%bOPTIONS:%b\n" "$CYAN" "$NC"
     printf "    -p, --python VERSION    Python version requirement (e.g., '3.11', '3.12') [default: %s]\n" "$DEFAULT_PYTHON_VERSION"
-    printf "    -t, --target DIRECTORY  Target directory where project will be created [default: ../]\n"
-    printf "    -a, --author NAME       Author name for the project\n"
+    printf "    -a, --author NAME       Author name for the project [default: Your Name]\n"
     printf "    -h, --help             Show this help message\n\n"
     printf "%bEXAMPLES:%b\n" "$CYAN" "$NC"
     printf "    %s my-awesome-app --python 3.12\n" "$0"
-    printf "    %s web-scraper --python 3.11 --author \"John Doe\" --target ~/projects\n" "$0"
+    printf "    %s web-scraper --python 3.11 --author \"John Doe\"\n" "$0"
     printf "    %s data-processor -p 3.13 -a \"Jane Smith\"\n\n" "$0"
+    printf "%bWORKS WITH:%b\n" "$CYAN" "$NC"
+    printf "    • GitHub template repositories (after using \"Use this template\")\n"
+    printf "    • Direct git clones\n"
+    printf "    • Downloaded ZIP files\n\n"
 }
 
 # Validate project name follows Python package naming conventions
@@ -161,41 +147,13 @@ replace_template_variables() {
         sed -i "s|${placeholder}|${value}|g" "$temp_file"
     done
 
-    # Replace author if provided and not default
-    if [[ "${TEMPLATE_VARS[AUTHOR]}" != "Your Name" ]]; then
-        sed -i "s/Your Name/${TEMPLATE_VARS[AUTHOR]}/g" "$temp_file"
-    fi
-
     # Move temp file back
     mv "$temp_file" "$file_path"
 }
 
-# Check if item should be excluded
-should_exclude() {
-    local item="$1"
-    local item_name
-    item_name=$(basename "$item")
-
-    # Check exclude directories (also check if any parent directory is excluded)
-    for exclude_dir in "${EXCLUDE_DIRS[@]}"; do
-        if [[ "$item_name" == "$exclude_dir" ]] || [[ "$item" == *"/$exclude_dir/"* ]]; then
-            return 0
-        fi
-    done
-
-    # Check exclude files
-    for exclude_file in "${EXCLUDE_FILES[@]}"; do
-        if [[ "$item_name" == "$exclude_file" ]]; then
-            return 0
-        fi
-    done
-
-    return 1
-}
-
 # Check if file needs template processing
 is_template_file() {
-    local file_path="$1" # This could be either just the filename or the relative path
+    local file_path="$1"
 
     for template_file in "${TEMPLATE_FILES[@]}"; do
         # Check if the file path ends with the template file pattern
@@ -207,65 +165,84 @@ is_template_file() {
     return 1
 }
 
-# Copy files recursively with template processing
-copy_template_files() {
-    local src_dir="$1"
-    local dst_dir="$2"
+# Check if file is a template setup file that should be removed
+is_template_setup_file() {
+    local file_name="$1"
 
-    log_info "Copying template files to $dst_dir"
-
-    # Create destination directory
-    mkdir -p "$dst_dir"
-
-    # Copy files and directories
-    while IFS= read -r -d '' item; do
-        if should_exclude "$item"; then
-            continue
+    for setup_file in "${TEMPLATE_SETUP_FILES[@]}"; do
+        if [[ "$file_name" == "$setup_file" ]]; then
+            return 0
         fi
+    done
 
-        local rel_path="${item#$src_dir/}"
-        local dst_item="$dst_dir/$rel_path"
-
-        if [[ -d "$item" ]]; then
-            mkdir -p "$dst_item"
-            echo "  📁 Created directory: $rel_path"
-        elif [[ -f "$item" ]]; then
-            # Create parent directory if needed
-            mkdir -p "$(dirname "$dst_item")"
-
-            # Get file name for processing
-            local file_name
-            file_name=$(basename "$item")
-
-            # Special handling for .envrc-sample -> .envrc
-            if [[ "$file_name" == ".envrc-sample" ]]; then
-                dst_item="$dst_dir/.envrc"
-            fi
-
-            # Copy file
-            cp "$item" "$dst_item"
-
-            # Check if it's a template file that needs processing
-            if is_template_file "$rel_path"; then
-                replace_template_variables "$dst_item"
-                if [[ "$file_name" == ".envrc-sample" ]]; then
-                    echo "  ✏️  Processed template: .envrc (from .envrc-sample)"
-                else
-                    echo "  ✏️  Processed template: $rel_path"
-                fi
-            else
-                echo "  📄 Copied: $rel_path"
-            fi
-        fi
-    done < <(find "$src_dir" -type f -o -type d | grep -v "^$src_dir$" | sort | tr '\n' '\0')
+    return 1
 }
 
-# Create a new project from the template
-create_project() {
+# Process template files in current directory
+process_template_files() {
+    log_info "Processing template files..."
+
+    # Process template files (exclude cache directories)
+    while IFS= read -r -d '' file; do
+        local rel_path="${file#$SCRIPT_DIR/}"
+        
+        # Skip cache directories and their contents
+        if [[ "$rel_path" == *".pytest_cache"* ]] || [[ "$rel_path" == *".mypy_cache"* ]] || [[ "$rel_path" == *".ruff_cache"* ]] || [[ "$rel_path" == *"__pycache__"* ]]; then
+            continue
+        fi
+        
+        if is_template_file "$rel_path"; then
+            replace_template_variables "$file"
+            echo "  ✏️  Processed: $rel_path"
+        fi
+    done < <(find "$SCRIPT_DIR" -type f -print0)
+
+    # Handle .envrc-sample -> .envrc conversion
+    if [[ -f "$SCRIPT_DIR/.envrc-sample" ]]; then
+        mv "$SCRIPT_DIR/.envrc-sample" "$SCRIPT_DIR/.envrc"
+        echo "  ✏️  Converted: .envrc-sample → .envrc"
+    fi
+
+    # Replace TEMPLATE_README.md with README.md if it exists
+    if [[ -f "$SCRIPT_DIR/TEMPLATE_README.md" ]]; then
+        mv "$SCRIPT_DIR/TEMPLATE_README.md" "$SCRIPT_DIR/README.md"
+        replace_template_variables "$SCRIPT_DIR/README.md"
+        echo "  ✏️  Replaced: README.md (from TEMPLATE_README.md)"
+    fi
+}
+
+# Clean up template setup files
+cleanup_template_files() {
+    log_info "Cleaning up template setup files..."
+
+    for setup_file in "${TEMPLATE_SETUP_FILES[@]}"; do
+        local file_path="$SCRIPT_DIR/$setup_file"
+        if [[ -f "$file_path" ]]; then
+            rm "$file_path"
+            echo "  🗑️  Removed: $setup_file"
+        fi
+    done
+}
+
+# Initialize git repository if not already initialized
+init_git_repo() {
+    if [[ ! -d "$SCRIPT_DIR/.git" ]]; then
+        log_info "Initializing git repository..."
+        cd "$SCRIPT_DIR"
+        git init
+        git add .
+        git commit -m "Initial commit: Set up ${TEMPLATE_VARS[PROJECT_NAME]} project from template"
+        echo "  📦 Git repository initialized"
+    else
+        log_info "Git repository already exists, skipping initialization"
+    fi
+}
+
+# Setup the project
+setup_project() {
     local project_name="$1"
-    local target_dir="$2"
-    local python_version="$3"
-    local author="$4"
+    local python_version="$2"
+    local author="$3"
 
     # Validate inputs
     if ! validate_project_name "$project_name"; then
@@ -280,52 +257,39 @@ create_project() {
         return 1
     fi
 
-    # Create project directory
-    local project_dir="$target_dir/$project_name"
-    if [[ -d "$project_dir" ]]; then
-        log_error "Directory already exists: $project_dir"
-        return 1
-    fi
-
-    log_info "Creating project '$project_name' in $project_dir"
+    log_info "Setting up project '$project_name' with Python $python_version"
 
     # Create template variables
     create_template_variables "$project_name" "$python_version" "$author"
 
-    # Copy and process template files
-    copy_template_files "$SCRIPT_DIR" "$project_dir"
+    # Process template files
+    process_template_files
 
-    # Copy TEMPLATE_README.md as README.md if it exists
-    if [[ -f "$SCRIPT_DIR/TEMPLATE_README.md" ]]; then
-        cp "$SCRIPT_DIR/TEMPLATE_README.md" "$project_dir/README.md"
-        replace_template_variables "$project_dir/README.md"
-        echo "  ✏️  Processed template: README.md (from TEMPLATE_README.md)"
-    fi
+    # Clean up template files
+    cleanup_template_files
 
-    log_success "Project '$project_name' created successfully!"
+    # Initialize git repository
+    init_git_repo
+
+    log_success "Project '$project_name' setup completed!"
     echo ""
     echo -e "${CYAN}📋 Next steps:${NC}"
-    echo "   cd $project_dir"
     echo "   make setup    # Set up development environment"
     echo "   make run      # Run the application"
     echo ""
+    echo -e "${YELLOW}💡 Tip:${NC} Your project is ready for development!"
 }
 
 # Parse command line arguments
 parse_args() {
     local project_name=""
     local python_version="$DEFAULT_PYTHON_VERSION"
-    local target_dir="$DEFAULT_TARGET_DIR"
     local author="Your Name"
 
     while [[ $# -gt 0 ]]; do
         case $1 in
         -p | --python)
             python_version="$2"
-            shift 2
-            ;;
-        -t | --target)
-            target_dir="$2"
             shift 2
             ;;
         -a | --author)
@@ -361,11 +325,8 @@ parse_args() {
         exit 1
     fi
 
-    # Resolve target directory to absolute path
-    target_dir=$(realpath "$target_dir")
-
-    # Create the project
-    create_project "$project_name" "$target_dir" "$python_version" "$author"
+    # Setup the project
+    setup_project "$project_name" "$python_version" "$author"
 }
 
 # Main entry point

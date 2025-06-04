@@ -29,29 +29,31 @@
 
 ## 🚀 Quick Start <a name = "quick_start"></a>
 
-Create a new Python project in 3 simple steps:
+Create a new Python project in just a few steps:
 
 ### Method 1: Use as GitHub Template (Recommended)
 
 ```bash
-# Click "Use this template" on GitHub, then:
+# 1. Click "Use this template" on GitHub to create your repository
+# 2. Clone your new repository and set it up:
 git clone https://github.com/YOUR-USERNAME/YOUR-PROJECT-NAME.git
 cd YOUR-PROJECT-NAME
-./init_project.sh YOUR-PROJECT-NAME --python 3.12 --author "Your Name"
+./setup.sh YOUR-PROJECT-NAME --python 3.12 --author "Your Name"
 ```
 
-### Method 2: Clone and Generate
+### Method 2: Clone and Generate New Project
 
 ```bash
+# Clone the template and create a new project:
 git clone https://github.com/jagd-main/python-dev-template.git
 cd python-dev-template
 ./init_project.sh my-awesome-project --python 3.12 --author "Your Name"
+cd ../my-awesome-project
 ```
 
-### 3. Set up and start developing
+### 3. Start developing
 
 ```bash
-cd ../my-awesome-project  # or just cd . if using Method 1
 make setup    # Set up development environment
 make run      # Run your application
 ```
@@ -69,7 +71,26 @@ make run      # Run your application
 
 ## 🛠️ Usage <a name = "usage"></a>
 
-### Template Initialization
+### Template Setup (GitHub Template / Downloaded Archive)
+
+Use this when you've used GitHub's "Use this template" feature or downloaded the template:
+
+```bash
+./setup.sh PROJECT_NAME [OPTIONS]
+
+Options:
+  -p, --python VERSION    Python version requirement (e.g., '3.11', '3.12') [default: 3.12]
+  -a, --author NAME       Author name for the project [default: Your Name]
+  -h, --help             Show help message
+
+Examples:
+  ./setup.sh web-scraper --python 3.11
+  ./setup.sh data-processor --python 3.12 --author "Jane Doe"
+```
+
+### Project Generation (From Clone)
+
+Use this when you've cloned the template repository and want to generate a new project:
 
 ```bash
 ./init_project.sh PROJECT_NAME [OPTIONS]
