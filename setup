@@ -15,7 +15,7 @@ readonly NC='\033[0m' # No Color
 
 # Script configuration
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly DEFAULT_PYTHON_VERSION="3.12"
+readonly DEFAULT_PYTHON_VERSION="3.13"
 
 # Files that need template variable replacement
 readonly -a TEMPLATE_FILES=(
@@ -42,12 +42,7 @@ readonly -a EXCLUDE_DIRS=(
 
 # Files to exclude when copying template
 readonly -a EXCLUDE_FILES=(
-    "init_project.py"
-    "init_project.sh"
-    "setup.py"
-    "setup.sh"
     "setup"
-    "TEMPLATE_README.md"
     ".coverage"
     "*.pyc"
     "*.pyo"
@@ -157,7 +152,7 @@ detect_operation_mode() {
     local current_dir="$(basename "$PWD")"
 
     # Check if we're in the template repository itself
-    if [[ "$PWD" == "$SCRIPT_DIR" ]] && [[ -f "$SCRIPT_DIR/setup" || -f "$SCRIPT_DIR/setup.sh" || -f "$SCRIPT_DIR/init_project.sh" ]]; then
+    if [[ "$PWD" == "$SCRIPT_DIR" ]] && [[ -f "$SCRIPT_DIR/setup" ]]; then
         if [[ -n "$project_name" ]]; then
             log_mode "Clone & Generate - Creating new project from template repository"
             OPERATION_MODE="$MODE_GENERATE"
@@ -306,13 +301,6 @@ process_template_files_in_place() {
         echo "  ✏️  Converted: .envrc-sample → .envrc"
     fi
 
-    # Replace TEMPLATE_README.md with README.md if it exists
-    if [[ -f "$TARGET_DIR/TEMPLATE_README.md" ]]; then
-        mv "$TARGET_DIR/TEMPLATE_README.md" "$TARGET_DIR/README.md"
-        replace_template_variables "$TARGET_DIR/README.md"
-        echo "  ✏️  Replaced: README.md (from TEMPLATE_README.md)"
-    fi
-
     # Clean up setup files
     cleanup_setup_files_in_place
 }
@@ -364,20 +352,13 @@ copy_template_files() {
             fi
         fi
     done < <(find "$src_dir" -type f -o -type d | grep -v "^$src_dir$" | sort | tr '\n' '\0')
-
-    # Copy TEMPLATE_README.md as README.md if it exists
-    if [[ -f "$src_dir/TEMPLATE_README.md" ]]; then
-        cp "$src_dir/TEMPLATE_README.md" "$dst_dir/README.md"
-        replace_template_variables "$dst_dir/README.md"
-        echo "  ✏️  Processed template: README.md (from TEMPLATE_README.md)"
-    fi
 }
 
 # Clean up setup files in current directory
 cleanup_setup_files_in_place() {
     log_info "Cleaning up setup files..."
 
-    local -a setup_files=("init_project.sh" "setup.sh" "setup" "setup.py" "init_project.py" "TEMPLATE_README.md")
+    local -a setup_files=("setup")
 
     for setup_file in "${setup_files[@]}"; do
         local file_path="$TARGET_DIR/$setup_file"
