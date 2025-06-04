@@ -1,0 +1,570 @@
+#!/bin/bash
+# Python Dev Template Setup Script
+# A unified script that intelligently handles both GitHub template setup and project generation.
+
+set -euo pipefail # Exit on error, undefined vars, pipe failures
+
+# Color codes for output
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[1;33m'
+readonly BLUE='\033[0;34m'
+readonly CYAN='\033[0;36m'
+readonly BOLD='\033[1m'
+readonly NC='\033[0m' # No Color
+
+# Script configuration
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly DEFAULT_PYTHON_VERSION="3.12"
+
+# Files that need template variable replacement
+readonly -a TEMPLATE_FILES=(
+    "pyproject.toml"
+    "Makefile"
+    "README.md"
+    ".envrc-sample"
+    "src/main.py"
+    "tests/test_main.py"
+)
+
+# Directories to exclude when copying template
+readonly -a EXCLUDE_DIRS=(
+    "__pycache__"
+    ".pytest_cache"
+    ".mypy_cache"
+    ".ruff_cache"
+    "build"
+    "dist"
+    ".git"
+    ".venv"
+    "coverage_html_report"
+)
+
+# Files to exclude when copying template
+readonly -a EXCLUDE_FILES=(
+    "init_project.py"
+    "init_project.sh"
+    "setup.py"
+    "setup.sh"
+    "setup"
+    "TEMPLATE_README.md"
+    ".coverage"
+    "*.pyc"
+    "*.pyo"
+)
+
+# Operation modes
+readonly MODE_IN_PLACE="in_place"
+readonly MODE_GENERATE="generate"
+
+# Global variables
+declare -gA TEMPLATE_VARS=()
+declare -g OPERATION_MODE=""
+declare -g TARGET_DIR=""
+
+# Logging functions
+log_info() {
+    echo -e "${BLUE}ℹ️  $1${NC}" >&2
+}
+
+log_success() {
+    echo -e "${GREEN}✅ $1${NC}" >&2
+}
+
+log_warning() {
+    echo -e "${YELLOW}⚠️  $1${NC}" >&2
+}
+
+log_error() {
+    echo -e "${RED}❌ $1${NC}" >&2
+}
+
+log_mode() {
+    echo -e "${CYAN}🔧 Mode: $1${NC}" >&2
+}
+
+# Show usage information
+show_help() {
+    printf "%bPython Dev Template Setup%b\n\n" "$BOLD" "$NC"
+    printf "%bUSAGE:%b\n" "$CYAN" "$NC"
+    printf "    %s [PROJECT_NAME] [OPTIONS]\n\n" "$0"
+    printf "%bARGUMENTS:%b\n" "$CYAN" "$NC"
+    printf "    PROJECT_NAME    Name for your project (optional - see modes below)\n\n"
+    printf "%bOPTIONS:%b\n" "$CYAN" "$NC"
+    printf "    -p, --python VERSION    Python version requirement (e.g., '3.11', '3.12') [default: %s]\n" "$DEFAULT_PYTHON_VERSION"
+    printf "    -t, --target DIRECTORY  Target directory (only for generate mode)\n"
+    printf "    -a, --author NAME       Author name for the project [default: Your Name]\n"
+    printf "    -m, --mode MODE         Force specific mode: 'in_place' or 'generate' [default: auto-detect]\n"
+    printf "    -h, --help             Show this help message\n\n"
+    printf "%bOPERATION MODES:%b\n" "$CYAN" "$NC"
+    printf "%bAuto-Detection (Recommended):%b\n" "$BOLD" "$NC"
+    printf "    The script automatically detects the correct mode based on context:\n\n"
+    printf "%b1. GitHub Template Mode (In-Place Setup):%b\n" "$YELLOW" "$NC"
+    printf "    • Detected when: Running in a repository created from GitHub template\n"
+    printf "    • Behavior: Sets up the current directory as your project\n"
+    printf "    • Usage: %s my-project --python 3.12 --author \"Your Name\"\n" "$0"
+    printf "    • Result: Current directory becomes 'my-project' with template processed\n\n"
+    printf "%b2. Clone & Generate Mode:%b\n" "$YELLOW" "$NC"
+    printf "    • Detected when: Running in the original template repository\n"
+    printf "    • Behavior: Creates a new project directory with processed template\n"
+    printf "    • Usage: %s my-project --python 3.12 --author \"Your Name\"\n" "$0"
+    printf "    • Result: Creates ../my-project/ (or custom target) with processed template\n\n"
+    printf "%bEXAMPLES:%b\n" "$CYAN" "$NC"
+    printf "    # Auto-detection (recommended)\n"
+    printf "    %s web-scraper --python 3.11 --author \"John Doe\"\n" "$0"
+    printf "    %s data-processor --python 3.12\n\n" "$0"
+    printf "    # Force specific mode\n"
+    printf "    %s my-app --mode in_place --python 3.12\n" "$0"
+    printf "    %s new-project --mode generate --target ~/projects --python 3.11\n\n" "$0"
+    printf "%bWORKS WITH:%b\n" "$CYAN" "$NC"
+    printf "    ✅ GitHub \"Use this template\" repositories\n"
+    printf "    ✅ Direct git clones\n"
+    printf "    ✅ Downloaded ZIP files\n"
+    printf "    ✅ Manual mode selection\n\n"
+}
+
+# Validate project name follows Python package naming conventions
+validate_project_name() {
+    local name="$1"
+
+    if [[ -z "$name" ]]; then
+        return 1
+    fi
+
+    # Check if it matches Python package naming pattern
+    if [[ ! "$name" =~ ^[a-z][a-z0-9_-]*[a-z0-9]$|^[a-z]$ ]]; then
+        return 1
+    fi
+
+    return 0
+}
+
+# Validate Python version format
+validate_python_version() {
+    local version="$1"
+
+    # Check if it matches version pattern (3.9 and above)
+    if [[ ! "$version" =~ ^3\.(9|1[0-9]|[2-9][0-9])$ ]]; then
+        return 1
+    fi
+
+    return 0
+}
+
+# Detect operation mode based on context
+detect_operation_mode() {
+    local project_name="$1"
+    local current_dir="$(basename "$PWD")"
+
+    # Check if we're in the template repository itself
+    if [[ "$PWD" == "$SCRIPT_DIR" ]] && [[ -f "$SCRIPT_DIR/setup" || -f "$SCRIPT_DIR/setup.sh" || -f "$SCRIPT_DIR/init_project.sh" ]]; then
+        if [[ -n "$project_name" ]]; then
+            log_mode "Clone & Generate - Creating new project from template repository"
+            OPERATION_MODE="$MODE_GENERATE"
+            TARGET_DIR="${TARGET_DIR:-$(dirname "$SCRIPT_DIR")/$project_name}"
+        else
+            log_error "Project name required when running from template repository"
+            echo "   Use: $0 YOUR_PROJECT_NAME [options]" >&2
+            return 1
+        fi
+    # Check if we're in a directory that looks like it was created from the template
+    elif [[ -f "$PWD/pyproject.toml" ]] && [[ -f "$PWD/Makefile" ]] && [[ -d "$PWD/src" ]]; then
+        local inferred_name="${project_name:-$current_dir}"
+        if validate_project_name "$inferred_name"; then
+            log_mode "GitHub Template Mode - Setting up current directory as project"
+            OPERATION_MODE="$MODE_IN_PLACE"
+            TARGET_DIR="$PWD"
+        else
+            log_error "Cannot infer valid project name from directory '$current_dir'"
+            echo "   Please provide a valid project name: $0 PROJECT_NAME [options]" >&2
+            return 1
+        fi
+    else
+        # Default to generate mode if project name provided
+        if [[ -n "$project_name" ]]; then
+            log_mode "Generate Mode - Creating new project directory"
+            OPERATION_MODE="$MODE_GENERATE"
+            TARGET_DIR="${TARGET_DIR:-$PWD/$project_name}"
+        else
+            log_error "Cannot determine operation mode"
+            echo "   Please provide a project name or run from a template directory" >&2
+            return 1
+        fi
+    fi
+
+    return 0
+}
+
+# Create template variables mapping
+create_template_variables() {
+    local project_name="$1"
+    local python_version="$2"
+    local author="${3:-Your Name}"
+
+    # Create different name formats
+    local package_name="${project_name,,}" # lowercase
+    package_name="${package_name//-/_}"    # replace hyphens with underscores
+
+    # Create class name (PascalCase)
+    local class_name=""
+    IFS='_-' read -ra PARTS <<<"$project_name"
+    for part in "${PARTS[@]}"; do
+        class_name+="$(tr '[:lower:]' '[:upper:]' <<<"${part:0:1}")${part:1}"
+    done
+
+    # Create associative array for template variables
+    TEMPLATE_VARS=(
+        ["PROJECT_NAME"]="$project_name"
+        ["PACKAGE_NAME"]="$package_name"
+        ["CLASS_NAME"]="$class_name"
+        ["PYTHON_VERSION"]="$python_version"
+        ["PYTHON_VERSION_NODOT"]="${python_version//./}"
+        ["AUTHOR"]="$author"
+    )
+}
+
+# Replace template variables in file content
+replace_template_variables() {
+    local file_path="$1"
+    local temp_file
+    temp_file=$(mktemp)
+
+    # Copy file to temp location
+    cp "$file_path" "$temp_file"
+
+    # Replace template placeholders with actual values
+    for var_name in "${!TEMPLATE_VARS[@]}"; do
+        local placeholder="{{${var_name}}}"
+        local value="${TEMPLATE_VARS[$var_name]}"
+        # Use | as delimiter to avoid conflicts with forward slashes in paths
+        sed -i "s|${placeholder}|${value}|g" "$temp_file"
+    done
+
+    # Move temp file back
+    mv "$temp_file" "$file_path"
+}
+
+# Check if item should be excluded
+should_exclude() {
+    local item="$1"
+    local item_name
+    item_name=$(basename "$item")
+
+    # Check exclude directories (also check if any parent directory is excluded)
+    for exclude_dir in "${EXCLUDE_DIRS[@]}"; do
+        if [[ "$item_name" == "$exclude_dir" ]] || [[ "$item" == *"/$exclude_dir/"* ]]; then
+            return 0
+        fi
+    done
+
+    # Check exclude files
+    for exclude_file in "${EXCLUDE_FILES[@]}"; do
+        if [[ "$item_name" == "$exclude_file" ]]; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+# Check if file needs template processing
+is_template_file() {
+    local file_path="$1"
+
+    for template_file in "${TEMPLATE_FILES[@]}"; do
+        # Check if the file path ends with the template file pattern
+        if [[ "$file_path" == "$template_file" ]] || [[ "$file_path" == *"/$template_file" ]]; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+# Process template files in place
+process_template_files_in_place() {
+    log_info "Processing template files in current directory..."
+
+    # Process template files (exclude cache directories)
+    while IFS= read -r -d '' file; do
+        local rel_path="${file#$TARGET_DIR/}"
+
+        # Skip cache directories and their contents
+        if [[ "$rel_path" == *".pytest_cache"* ]] || [[ "$rel_path" == *".mypy_cache"* ]] || [[ "$rel_path" == *".ruff_cache"* ]] || [[ "$rel_path" == *"__pycache__"* ]]; then
+            continue
+        fi
+
+        if is_template_file "$rel_path"; then
+            replace_template_variables "$file"
+            echo "  ✏️  Processed: $rel_path"
+        fi
+    done < <(find "$TARGET_DIR" -type f -print0)
+
+    # Handle .envrc-sample -> .envrc conversion
+    if [[ -f "$TARGET_DIR/.envrc-sample" ]]; then
+        mv "$TARGET_DIR/.envrc-sample" "$TARGET_DIR/.envrc"
+        echo "  ✏️  Converted: .envrc-sample → .envrc"
+    fi
+
+    # Replace TEMPLATE_README.md with README.md if it exists
+    if [[ -f "$TARGET_DIR/TEMPLATE_README.md" ]]; then
+        mv "$TARGET_DIR/TEMPLATE_README.md" "$TARGET_DIR/README.md"
+        replace_template_variables "$TARGET_DIR/README.md"
+        echo "  ✏️  Replaced: README.md (from TEMPLATE_README.md)"
+    fi
+
+    # Clean up setup files
+    cleanup_setup_files_in_place
+}
+
+# Copy files recursively with template processing (generate mode)
+copy_template_files() {
+    local src_dir="$1"
+    local dst_dir="$2"
+
+    log_info "Copying template files to $dst_dir"
+
+    # Create destination directory
+    mkdir -p "$dst_dir"
+
+    # Copy files and directories
+    while IFS= read -r -d '' item; do
+        if should_exclude "$item"; then
+            continue
+        fi
+
+        local rel_path="${item#$src_dir/}"
+        local dst_item="$dst_dir/$rel_path"
+
+        if [[ -d "$item" ]]; then
+            mkdir -p "$dst_item"
+            echo "  📁 Created directory: $rel_path"
+        elif [[ -f "$item" ]]; then
+            # Create parent directory if needed
+            mkdir -p "$(dirname "$dst_item")"
+
+            # Special handling for .envrc-sample -> .envrc
+            if [[ "$(basename "$item")" == ".envrc-sample" ]]; then
+                dst_item="$dst_dir/.envrc"
+            fi
+
+            # Copy file
+            cp "$item" "$dst_item"
+
+            # Check if it's a template file that needs processing
+            if is_template_file "$rel_path"; then
+                replace_template_variables "$dst_item"
+                if [[ "$(basename "$item")" == ".envrc-sample" ]]; then
+                    echo "  ✏️  Processed template: .envrc (from .envrc-sample)"
+                else
+                    echo "  ✏️  Processed template: $rel_path"
+                fi
+            else
+                echo "  📄 Copied: $rel_path"
+            fi
+        fi
+    done < <(find "$src_dir" -type f -o -type d | grep -v "^$src_dir$" | sort | tr '\n' '\0')
+
+    # Copy TEMPLATE_README.md as README.md if it exists
+    if [[ -f "$src_dir/TEMPLATE_README.md" ]]; then
+        cp "$src_dir/TEMPLATE_README.md" "$dst_dir/README.md"
+        replace_template_variables "$dst_dir/README.md"
+        echo "  ✏️  Processed template: README.md (from TEMPLATE_README.md)"
+    fi
+}
+
+# Clean up setup files in current directory
+cleanup_setup_files_in_place() {
+    log_info "Cleaning up setup files..."
+
+    local -a setup_files=("init_project.sh" "setup.sh" "setup" "setup.py" "init_project.py" "TEMPLATE_README.md")
+
+    for setup_file in "${setup_files[@]}"; do
+        local file_path="$TARGET_DIR/$setup_file"
+        if [[ -f "$file_path" ]] && [[ "$file_path" != "$0" ]]; then
+            rm "$file_path"
+            echo "  🗑️  Removed: $setup_file"
+        fi
+    done
+}
+
+# Initialize git repository if not already initialized
+init_git_repo() {
+    local project_name="$1"
+
+    if [[ ! -d "$TARGET_DIR/.git" ]]; then
+        log_info "Initializing git repository..."
+        cd "$TARGET_DIR"
+        git init
+        git add .
+        git commit -m "Initial commit: Set up $project_name project from template"
+        echo "  📦 Git repository initialized"
+    else
+        log_info "Git repository already exists, skipping initialization"
+    fi
+}
+
+# Main setup function
+setup_project() {
+    local project_name="$1"
+    local python_version="$2"
+    local author="$3"
+    local mode="$4"
+
+    # Override auto-detection if mode is specified
+    if [[ -n "$mode" ]]; then
+        case "$mode" in
+        "in_place" | "inplace")
+            OPERATION_MODE="$MODE_IN_PLACE"
+            TARGET_DIR="$PWD"
+            log_mode "Forced In-Place Mode - Setting up current directory"
+            ;;
+        "generate" | "copy")
+            OPERATION_MODE="$MODE_GENERATE"
+            TARGET_DIR="${TARGET_DIR:-$(dirname "$SCRIPT_DIR")/$project_name}"
+            log_mode "Forced Generate Mode - Creating new project directory"
+            ;;
+        *)
+            log_error "Invalid mode: $mode. Use 'in_place' or 'generate'"
+            return 1
+            ;;
+        esac
+    else
+        # Auto-detect mode
+        if ! detect_operation_mode "$project_name"; then
+            return 1
+        fi
+    fi
+
+    # For in-place mode, infer project name from directory if not provided
+    if [[ "$OPERATION_MODE" == "$MODE_IN_PLACE" ]] && [[ -z "$project_name" ]]; then
+        project_name="$(basename "$TARGET_DIR")"
+    fi
+
+    # Validate inputs
+    if ! validate_project_name "$project_name"; then
+        log_error "Invalid project name: $project_name"
+        echo "   Project names should be lowercase, use hyphens or underscores, and start with a letter" >&2
+        return 1
+    fi
+
+    if ! validate_python_version "$python_version"; then
+        log_error "Invalid Python version: $python_version"
+        echo "   Use format like '3.11', '3.12', etc. (3.9 or higher)" >&2
+        return 1
+    fi
+
+    # Check if directory already exists (for generate mode)
+    if [[ "$OPERATION_MODE" == "$MODE_GENERATE" ]] && [[ -d "$TARGET_DIR" ]]; then
+        log_error "Directory already exists: $TARGET_DIR"
+        return 1
+    fi
+
+    log_info "Setting up project '$project_name' with Python $python_version"
+
+    # Create template variables
+    create_template_variables "$project_name" "$python_version" "$author"
+
+    # Execute based on mode
+    case "$OPERATION_MODE" in
+    "$MODE_IN_PLACE")
+        process_template_files_in_place
+        ;;
+    "$MODE_GENERATE")
+        copy_template_files "$SCRIPT_DIR" "$TARGET_DIR"
+        ;;
+    *)
+        log_error "Unknown operation mode: $OPERATION_MODE"
+        return 1
+        ;;
+    esac
+
+    # Initialize git repository
+    init_git_repo "$project_name"
+
+    log_success "Project '$project_name' setup completed!"
+    echo ""
+    echo -e "${CYAN}📋 Next steps:${NC}"
+    if [[ "$OPERATION_MODE" == "$MODE_GENERATE" ]]; then
+        echo "   cd $TARGET_DIR"
+    fi
+    echo "   make setup    # Set up development environment"
+    echo "   make run      # Run the application"
+    echo ""
+    echo -e "${YELLOW}💡 Tip:${NC} Your project is ready for development!"
+}
+
+# Parse command line arguments
+parse_args() {
+    local project_name=""
+    local python_version="$DEFAULT_PYTHON_VERSION"
+    local author="Your Name"
+    local mode=""
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+        -p | --python)
+            python_version="$2"
+            shift 2
+            ;;
+        -t | --target)
+            TARGET_DIR="$2"
+            shift 2
+            ;;
+        -a | --author)
+            author="$2"
+            shift 2
+            ;;
+        -m | --mode)
+            mode="$2"
+            shift 2
+            ;;
+        -h | --help)
+            show_help
+            exit 0
+            ;;
+        -*)
+            log_error "Unknown option: $1"
+            show_help
+            exit 1
+            ;;
+        *)
+            if [[ -z "$project_name" ]]; then
+                project_name="$1"
+            else
+                log_error "Too many arguments"
+                show_help
+                exit 1
+            fi
+            shift
+            ;;
+        esac
+    done
+
+    # Setup the project
+    setup_project "$project_name" "$python_version" "$author" "$mode"
+}
+
+# Error handling with cleanup
+cleanup_on_error() {
+    local exit_code=$?
+    if [[ $exit_code -ne 0 ]] && [[ -n "${TARGET_DIR:-}" ]] && [[ "$OPERATION_MODE" == "$MODE_GENERATE" ]]; then
+        log_warning "Setup failed, cleaning up partially created directory..."
+        if [[ -d "$TARGET_DIR" ]] && [[ "$TARGET_DIR" != "$HOME" ]] && [[ "$TARGET_DIR" != "/" ]]; then
+            rm -rf "$TARGET_DIR"
+            echo "  🗑️  Removed: $TARGET_DIR"
+        fi
+    fi
+    exit $exit_code
+}
+
+# Set up error handling
+trap cleanup_on_error ERR
+
+# Main entry point
+main() {
+    parse_args "$@"
+}
+
+# Run main function with all arguments
+main "$@"

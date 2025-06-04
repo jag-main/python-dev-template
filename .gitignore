@@ -1,6 +1,9 @@
 # Template-specific ignores
 test-*
 sample-*
+setup.py
+init_project.py
+TEMPLATE_README.md
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
