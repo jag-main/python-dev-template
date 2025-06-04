@@ -113,19 +113,6 @@ Examples:
   ./setup my-app --mode in_place --python 3.12
 ```
 
-### Legacy Scripts (Deprecated)
-
-The unified `setup` script has replaced the individual setup scripts. For reference, the old methods were:
-
-<details>
-<summary>Click to view legacy documentation</summary>
-
-The individual scripts have been removed as they are no longer needed.
-
-**Recommendation:** Use the unified `setup` script instead.
-
-</details>
-
 ## 🔄 Development Workflow <a name = "workflow"></a>
 
 Once you've created your project, use these commands for daily development:
