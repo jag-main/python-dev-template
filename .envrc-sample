@@ -1,13 +1,5 @@
 # .envrc for {{PROJECT_NAME}}
 # This file is used by direnv to automatically set environment variables
-# Copy this file to .envrc and edit as needed for your project
-
-# Set Python version for the project
-# export PYTHON_VERSION={{PYTHON_VERSION}}
 
 # Add project source to Python path
 export PYTHONPATH="$PWD/src:$PYTHONPATH"
-
-# Virtual environment path
-export VIRTUAL_ENV="$PWD/.venv"
-export PATH="$VIRTUAL_ENV/bin:$PATH"

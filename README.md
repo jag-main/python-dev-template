@@ -8,7 +8,7 @@
 <div align="center">
 
 [![Status](https://img.shields.io/badge/status-active-success.svg)](https://github.com/jagd-main/python-dev-template)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](/LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](/LICENCE)
 
 </div>
 
@@ -139,8 +139,8 @@ your-new-project/
 
 <div align="center">
 
-**Happy Coding! 🐍✨**
+## Happy Coding! 🐍✨
 
-*Built with ❤️ for the Python community*
+Built with ❤️ for the Python community
 
 </div>
