@@ -128,7 +128,7 @@ sync: check-uv ## 📦 Sync dependencies and create virtual environment
 .PHONY: install-hooks
 install-hooks: sync ## 🪝 Install pre-commit hooks
 	@$(call log_info,Installing pre-commit hooks...)
-	@uv run pre-commit install >/dev/null 2>&1 || { \
+	@uv run pre-commit install || { \
 		$(call log_error,Failed to install pre-commit hooks); \
 		exit 1; \
 	}

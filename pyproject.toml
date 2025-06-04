@@ -3,11 +3,18 @@ name = "project-template"
 version = "0.1.0"
 description = "A modern Python project created from the dev template"
 readme = "README.md"
-requires-python = ">={{PYTHON_VERSION}}"
+requires-python = ">=3.13"
 dependencies = []
 
 [dependency-groups]
-dev = ["isort>=6.0.1", "pytest>=8.4.0", "pytest-cov>=6.1.1", "ruff>=0.11.12"]
+dev = [
+    "isort>=6.0.1",
+    "mypy>=1.12.1",
+    "pre-commit>=4.0.1",
+    "pytest>=8.4.0",
+    "pytest-cov>=6.1.1",
+    "ruff>=0.11.12",
+]
 
 
 # TESTING configurations
@@ -48,7 +55,7 @@ sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
 
 # MYPY configurations
 [tool.mypy]
-python_version = "{{PYTHON_VERSION}}"
+python_version = "3.13"
 strict = true
 warn_unused_configs = true
 disallow_any_generics = true

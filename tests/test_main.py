@@ -4,7 +4,6 @@ import sys
 from io import StringIO
 from unittest.mock import patch
 
-
 from src.main import main
 
 
