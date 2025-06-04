@@ -36,19 +36,19 @@ END := \033[0m
 # Utility Functions
 # -----------------
 define log_info
-	@echo "$(BLUE)ℹ️  $(1)$(END)"
+echo "$(BLUE)ℹ️  $(1)$(END)"
 endef
 
 define log_success
-	@echo "$(GREEN)✅ $(1)$(END)"
+echo "$(GREEN)✅ $(1)$(END)"
 endef
 
 define log_warning
-	@echo "$(YELLOW)⚠️  $(1)$(END)"
+echo "$(YELLOW)⚠️  $(1)$(END)"
 endef
 
 define log_error
-	@echo "$(RED)❌ $(1)$(END)"
+echo "$(RED)❌ $(1)$(END)"
 endef
 
 ################################################################################
