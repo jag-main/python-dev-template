@@ -29,35 +29,79 @@
 
 ## 🚀 Quick Start <a name = "quick_start"></a>
 
-Create a new Python project with intelligent auto-detection:
+Create a new Python project:
 
-### 🎯 **Unified Setup Script** (Recommended)
+### 📋 **Prerequisites**
+
+Before using this template, install the required tools:
+
+1. **UV Package Manager** (Required):
+
+   ```bash
+   # On macOS/Linux:
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+
+   # On Windows:
+   powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+   # Or via package managers:
+   # macOS: brew install uv
+   # Ubuntu/Debian: sudo apt install uv
+   ```
+
+2. **direnv** (Optional but recommended for automatic environment setup):
+
+   ```bash
+   # On macOS:
+   brew install direnv
+
+   # On Ubuntu/Debian:
+   sudo apt install direnv
+
+   # On other systems: https://direnv.net/docs/installation.html
+   ```
+
+   After installation, add direnv to your shell:
+
+   ```bash
+   # For bash: echo 'eval "$(direnv hook bash)"' >> ~/.bashrc
+   # For zsh: echo 'eval "$(direnv hook zsh)"' >> ~/.zshrc
+   ```
+
+### 🎯 **Setup Script**
 
 The `setup` script automatically detects the correct mode based on your context:
 
-```bash
-# GitHub Template Usage (Auto-detected)
-# 1. Click "Use this template" on GitHub to create your repository
-# 2. Clone and set up:
-git clone https://github.com/YOUR-USERNAME/YOUR-PROJECT-NAME.git
-cd YOUR-PROJECT-NAME
-./setup my-project-name --python 3.12 --author "Your Name"
-```
+- GitHub Template Usage (Auto-detected)
 
-```bash
-# Clone & Generate Usage (Auto-detected)
-# 1. Clone the template repository and create new project:
-git clone https://github.com/jagd-main/python-dev-template.git
-cd python-dev-template
-./setup my-awesome-project --python 3.12 --author "Your Name"
-cd ../my-awesome-project
-```
+    ```bash
+    # 1. Click "Use this template" on GitHub to create your repository
+    # 2. Clone and set up:
+    git clone https://github.com/YOUR-USERNAME/YOUR-PROJECT-NAME.git
+    cd YOUR-PROJECT-NAME
+    chmod +x setup  # Make setup script executable
+    ./setup my-project-name --python 3.12 --author "Your Name"
+    ```
+
+- Clone & Generate Usage (Auto-detected)
+
+    ```bash
+    # 1. Clone the template repository and create new project:
+    git clone https://github.com/jagd-main/python-dev-template.git
+    cd python-dev-template
+    chmod +x setup  # Make setup script executable
+    ./setup my-awesome-project --python 3.12 --author "Your Name"
+    cd ../my-awesome-project
+    ```
 
 ### 🛠️ **Manual Mode Selection**
 
 Force a specific mode if auto-detection isn't working:
 
 ```bash
+# Ensure setup script is executable first
+chmod +x setup
+
 # Force in-place setup (GitHub template mode)
 ./setup my-project --mode in_place --python 3.12 --author "Your Name"
 
@@ -106,6 +150,12 @@ Auto-Detection Logic:
   🔍 GitHub Template Mode    Detected when in a template-derived repository
   🔍 Clone & Generate Mode   Detected when in the original template repository
   🔍 Manual Override         Use --mode to force specific behavior
+
+Prerequisites:
+  Make sure the setup script is executable: chmod +x setup
+  Install required tools:
+    - UV package manager: https://docs.astral.sh/uv/getting-started/installation/
+    - direnv (optional but recommended): https://direnv.net/docs/installation.html
 
 Examples:
   ./setup web-scraper --python 3.11 --author "John Doe"
