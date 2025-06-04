@@ -235,6 +235,17 @@ replace_template_variables() {
         sed -i "s|${placeholder}|${value}|g" "$temp_file"
     done
 
+    # Handle special literal placeholders that were changed for linting compliance
+    # Replace "project-template" with the actual project name
+    if [[ -n "${TEMPLATE_VARS[PROJECT_NAME]:-}" ]]; then
+        sed -i "s|project-template|${TEMPLATE_VARS[PROJECT_NAME]}|g" "$temp_file"
+    fi
+
+    # Replace "py313" with the actual Python version format
+    if [[ -n "${TEMPLATE_VARS[PYTHON_VERSION_NODOT]:-}" ]]; then
+        sed -i "s|py313|py${TEMPLATE_VARS[PYTHON_VERSION_NODOT]}|g" "$temp_file"
+    fi
+
     # Move temp file back
     mv "$temp_file" "$file_path"
 }

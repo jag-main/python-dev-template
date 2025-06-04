@@ -1,5 +1,5 @@
 [project]
-name = "{{PROJECT_NAME}}"
+name = "project-template"
 version = "0.1.0"
 description = "A modern Python project created from the dev template"
 readme = "README.md"
@@ -21,7 +21,7 @@ addopts = ["--import-mode=importlib"]
 [tool.ruff]
 line-length = 120
 indent-width = 4
-target-version = "py{{PYTHON_VERSION_NODOT}}"
+target-version = "py313"
 
 [tool.ruff.lint]
 fixable = ["ALL"]
